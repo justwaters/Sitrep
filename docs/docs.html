@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documentation — Sitrep</title>
+<meta name="description" content="In-depth Sitrep documentation: architecture, install, manager and worker setup, CLI reference, configuration reference, report payload shapes, local API, systemd management, troubleshooting, and design tradeoffs.">
+<meta name="theme-color" content="#0A0E12">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%230A0E12'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23F5B448'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="index.html" class="wordmark">SITREP<span class="cursor" aria-hidden="true">_</span></a>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="index.html">Home</a>
+      <a href="https://github.com/justwaters/Sitrep" class="nav-github">GitHub ↗</a>
+    </nav>
+    <div class="clock" aria-hidden="true">
+      <span id="epoch-clock">0000000000</span>
+      <span class="clock-label">utc epoch</span>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <div class="docs-hero">
+    <div class="section-inner">
+      <p class="eyebrow">documentation</p>
+      <h1>Everything Sitrep does, in one place.</h1>
+      <p class="lede">Architecture, install, setup, every CLI command and API endpoint, the exact shape of every report, and the tradeoffs made along the way. For a faster overview, see the <a href="index.html">homepage</a>.</p>
+    </div>
+  </div>
+
+  <div class="docs-layout">
+    <aside class="docs-sidebar">
+      <p class="docs-sidebar-title">Contents</p>
+      <nav aria-label="Documentation contents">
+        <ul id="docs-toc">
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#architecture">Architecture</a></li>
+          <li><a href="#requirements">Requirements</a></li>
+          <li><a href="#install">Install</a></li>
+          <li><a href="#manager-setup">Manager setup</a></li>
+          <li><a href="#worker-enrollment">Worker enrollment</a></li>
+          <li><a href="#cli-reference">CLI reference</a></li>
+          <li><a href="#config-reference">Configuration reference</a></li>
+          <li><a href="#report-reference">Report data reference</a></li>
+          <li><a href="#local-api">Local API</a></li>
+          <li><a href="#services">Managing the services</a></li>
+          <li><a href="#troubleshooting">Troubleshooting</a></li>
+          <li><a href="#tradeoffs">Design tradeoffs</a></li>
+          <li><a href="#development">Development</a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <div class="docs-content">
+
+      <section class="docs-section" id="overview">
+        <h2>Overview</h2>
+        <p>Sitrep is a manager and worker agent for Linux fleets. A manager listens for status reports and exposes them over a local JSON API; workers enroll with the manager once and then report on an interval the manager controls. Every connection between a worker and its manager is mutual TLS, using a certificate authority the manager generates itself — no external PKI, no cloud service, no cluster to run.</p>
+        <p>Every report carries an epoch timestamp and covers whichever checks the manager has enabled: internet reachability, disk space, DRAM usage, CPU usage, and git auth status. The manager keeps only the latest report per worker, in memory — see <a href="#tradeoffs">design tradeoffs</a> for why.</p>
+      </section>
+
+      <section class="docs-section" id="architecture">
+        <h2>Architecture</h2>
+        <p>Two listeners, two ports, one certificate authority. The manager generates its CA and its own server certificate on first startup. A worker enrolls exactly once — over a connection pinned to the manager's server certificate fingerprint — and receives a signed client certificate back. Every connection after that is full mutual TLS.</p>
+
+        <div class="diagram">
+          <div class="diagram-node">
+            <span class="diagram-label">worker</span>
+          </div>
+          <div class="diagram-flow">
+            <span class="diagram-arrow">enroll once, over a pinned connection</span>
+            <div class="diagram-node port">
+              <span class="diagram-label">:8444</span>
+              <span class="diagram-sub">no client cert required</span>
+            </div>
+          </div>
+          <div class="diagram-flow">
+            <span class="diagram-arrow">report on interval, mutual TLS</span>
+            <div class="diagram-node port">
+              <span class="diagram-label">:8443</span>
+              <span class="diagram-sub">RequireAndVerifyClientCert</span>
+            </div>
+          </div>
+          <div class="diagram-flow">
+            <span class="diagram-arrow">query results</span>
+            <div class="diagram-node port">
+              <span class="diagram-label">127.0.0.1:8080</span>
+              <span class="diagram-sub">local json api, loopback only</span>
+            </div>
+          </div>
+        </div>
+
+        <h3>Why two separate listeners</h3>
+        <p>Go's <code>tls.Config.ClientAuth</code> is a listener-wide policy, not a per-route one. Rather than branch on it inside a handler, Sitrep runs the enrollment endpoint and the report endpoint on entirely separate <code>net.Listener</code>s with different <code>tls.Config</code>s. A worker with no certificate yet can physically only reach the enrollment port; the report port rejects the TLS handshake itself — before any handler code runs — for any connection that doesn't present a certificate signed by the manager's CA.</p>
+
+        <h3>Identity binding</h3>
+        <p>Every report handler cross-checks the verified client certificate's common name against the <code>worker_id</code> claimed in the report body. A worker cannot report under another worker's identity, even with a certificate that's validly signed by the same CA.</p>
+
+        <h3>Config propagation</h3>
+        <p>There's no separate push channel for interval or enabled-check changes. Every response to a report — a <code>ReportAck</code> — carries the manager's <em>current</em> interval and enabled checks. The worker compares that to what it's currently using and, if either differs, updates its ticker and rewrites its local config to match. A manager-side change (via the <a href="#local-api">local API</a>) reaches every worker within one of that worker's own reporting intervals, and workers only ever dial out — nothing needs an inbound connection to a worker.</p>
+      </section>
+
+      <section class="docs-section" id="requirements">
+        <h2>Requirements</h2>
+        <ul>
+          <li>Linux with systemd — the setup wizards install and manage systemd units directly.</li>
+          <li>Root privileges for first-run setup on both the manager and each worker (creates a dedicated <code>sitrep</code> system user, writes to <code>/etc/sitrep</code> and <code>/etc/systemd/system</code>).</li>
+          <li><code>ping</code> on any worker with the <code>internet</code> check enabled.</li>
+          <li><code>gh</code> (the GitHub CLI) on any worker with the <code>gitauth</code> check enabled.</li>
+        </ul>
+        <p>Missing <code>ping</code>/<code>gh</code> aren't a blocker — the worker wizard detects them, shows the exact install command for your distro's package manager, and only runs it on explicit confirmation. Declining just means that check reports an error until it's installed.</p>
+      </section>
+
+      <section class="docs-section" id="install">
+        <h2>Install</h2>
+        <p>Sitrep is a single Go binary with no runtime dependencies of its own. Build it from source (Go 1.27+):</p>
+        <div class="code-block">
+          <div class="code-block-head">
+            <span>build</span>
+            <button class="copy-btn" type="button" data-copy-target="code-install-build">copy</button>
+          </div>
+          <pre><code id="code-install-build">git clone https://github.com/justwaters/Sitrep.git
+cd Sitrep
+make linux</code></pre>
+        </div>
+        <p><code>make linux</code> cross-compiles <code>bin/sitrep-linux-amd64</code> and <code>bin/sitrep-linux-arm64</code> — the artifacts you actually deploy, regardless of what platform you're building on. Copy the one matching your target's architecture and put it on <code>PATH</code>:</p>
+        <div class="code-block">
+          <div class="code-block-head">
+            <span>deploy</span>
+            <button class="copy-btn" type="button" data-copy-target="code-install-deploy">copy</button>
+          </div>
+          <pre><code id="code-install-deploy">scp bin/sitrep-linux-amd64 myhost:/tmp/sitrep
+ssh myhost 'sudo install -m 0755 /tmp/sitrep /usr/local/bin/sitrep'</code></pre>
+        </div>
+        <p><code>make build</code> also exists, producing a host-platform binary — useful for running <code>go test</code>/<code>go vet</code> during development, but not what you'd deploy unless your dev machine is also Linux.</p>
+      </section>
+
+      <section class="docs-section" id="manager-setup">
+        <h2>Manager setup</h2>
+        <p>On the machine that will collect reports:</p>
+        <div class="code-block">
+          <div class="code-block-head">
+            <span>manager</span>
+            <button class="copy-btn" type="button" data-copy-target="code-manager-setup">copy</button>
+          </div>
+          <pre><code id="code-manager-setup">sudo sitrep manager start</code></pre>
+        </div>
+        <p>With no existing config, this launches a one-time interactive wizard:</p>
+        <ol>
+          <li><strong>Report listen address</strong> — mTLS, default <code>0.0.0.0:8443</code>. Where workers send reports.</li>
+          <li><strong>Enrollment listen address</strong> — mTLS bootstrap, default <code>0.0.0.0:8444</code>. Where workers enroll.</li>
+          <li><strong>Advertised address</strong> — the hostname or IP workers should use to reach this manager. Embedded as a SAN in the manager's server certificate and printed by <code>token create</code>.</li>
+          <li><strong>Local query API address</strong> — default <code>127.0.0.1:8080</code>. Must resolve to a loopback address; the manager refuses to start otherwise.</li>
+          <li><strong>Enabled checks</strong> — all five by default, individually toggleable.</li>
+          <li><strong>Reporting interval</strong> — Go duration syntax, e.g. <code>30s</code>, <code>1m</code>, <code>5m</code>.</li>
+        </ol>
+        <p>The wizard then creates the <code>sitrep</code> system user, writes <code>/etc/sitrep/manager/config.yaml</code>, and installs and starts <code>sitrep-manager.service</code>. The manager generates its CA and server certificate on its own first real startup, running as the <code>sitrep</code> user — the wizard itself never touches key material.</p>
+        <p>Running <code>sitrep manager start</code> again after setup doesn't re-open the wizard — it just prints the current config path and systemd status.</p>
+      </section>
+
+      <section class="docs-section" id="worker-enrollment">
+        <h2>Worker enrollment</h2>
+        <p>On the manager, create a one-time token for the new worker:</p>
+        <div class="code-block">
+          <div class="code-block-head">
+            <span>manager</span>
+            <button class="copy-btn" type="button" data-copy-target="code-token-create">copy</button>
+          </div>
+          <pre><code id="code-token-create">sudo sitrep manager token create</code></pre>
+        </div>
+        <p>This prints four values the worker operator needs — the manager's enrollment address, the token itself, its expiry, and the manager's server certificate fingerprint:</p>
+        <div class="code-block">
+          <pre><code>Enrollment token created. Give the worker operator all four of these values:
+  Manager address:  10.0.0.5:8444
+  Token:            sitrep_3f9a...
+  Expires:          2026-09-03T15:32:10Z
+  Cert fingerprint: 8f2c1e...</code></pre>
+        </div>
+        <p>The token is single-use and expires 15 minutes after creation by default — override with <code>--ttl 1h</code> or any other duration. On the worker machine:</p>
+        <div class="code-block">
+          <div class="code-block-head">
+            <span>worker</span>
+            <button class="copy-btn" type="button" data-copy-target="code-worker-setup">copy</button>
+          </div>
+          <pre><code id="code-worker-setup">sudo sitrep worker start</code></pre>
+        </div>
+        <p>The wizard checks for <code>ping</code>/<code>gh</code>, offering to install whichever is missing; asks for the manager address, token, and certificate fingerprint; performs the enrollment handshake; writes <code>/etc/sitrep/worker/config.yaml</code> plus the issued client certificate and the manager's CA certificate; and installs and starts <code>sitrep-worker.service</code>. The worker begins reporting immediately, at the interval the manager pushed during enrollment.</p>
+        <p>Under the hood: the worker generates its own keypair and a certificate signing request locally — the private key never leaves the worker. It presents that CSR plus the token over a TLS connection pinned to the fingerprint above; the manager validates the token, signs the CSR, and returns the resulting client certificate along with its own CA certificate and current config.</p>
+      </section>
+
+      <section class="docs-section" id="cli-reference">
+        <h2>CLI reference</h2>
+
+        <h3><code>sitrep manager start</code></h3>
+        <p>Runs the setup wizard on first launch (no config present yet), or reports current status if already configured. With <code>--foreground</code>, skips the wizard and runs the manager directly in the foreground — this is what the systemd unit's <code>ExecStart</code> actually invokes.</p>
+        <div class="docs-table-scroll">
+<table class="docs-table">
+          <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>--data-dir</code></td><td><code>/etc/sitrep/manager</code></td><td>Directory holding the manager's CA, server cert, and config.</td></tr>
+            <tr><td><code>--foreground</code></td><td><code>false</code></td><td>Run without the interactive wizard, even on first launch.</td></tr>
+          </tbody>
+        </table>
+        </div>
+
+        <h3><code>sitrep manager token create</code></h3>
+        <p>Creates a one-time enrollment token via the manager's local API and prints the four values a worker needs.</p>
+        <div class="docs-table-scroll">
+<table class="docs-table">
+          <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>--data-dir</code></td><td><code>/etc/sitrep/manager</code></td><td>Directory holding the manager's config (used to find its local API address).</td></tr>
+            <tr><td><code>--ttl</code></td><td><code>15m</code></td><td>Token validity window; it must be used before this elapses.</td></tr>
+          </tbody>
+        </table>
+        </div>
+
+        <h3><code>sitrep manager status</code></h3>
+        <p>Prints the <code>sitrep-manager.service</code> systemd state (<code>systemctl is-active</code> under the hood). No flags.</p>
+
+        <h3><code>sitrep worker start</code></h3>
+        <p>Same shape as <code>manager start</code>, for the worker agent.</p>
+        <div class="docs-table-scroll">
+<table class="docs-table">
+          <thead><tr><th>Flag</th><th>Default</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>--data-dir</code></td><td><code>/etc/sitrep/worker</code></td><td>Directory holding the worker's client cert and config.</td></tr>
+            <tr><td><code>--foreground</code></td><td><code>false</code></td><td>Run without the interactive wizard, even on first launch.</td></tr>
+          </tbody>
+        </table>
+        </div>
+
+        <h3><code>sitrep worker status</code></h3>
+        <p>Prints the <code>sitrep-worker.service</code> systemd state. No flags.</p>
+
+        <h3><code>sitrep version</code></h3>
+        <p>Prints the build version, commit, and build date (set via <code>-ldflags</code> at build time — see the <code>Makefile</code>). No flags.</p>
+      </section>
+
+      <section class="docs-section" id="config-reference">
+        <h2>Configuration reference</h2>
+        <p>Both agents store their config as YAML. Field names match the YAML keys on disk.</p>
+
+        <h3>Manager — <code>/etc/sitrep/manager/config.yaml</code></h3>
+        <div class="docs-table-scroll">
+<table class="docs-table">
+          <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>listen_addr</code></td><td>string</td><td><code>0.0.0.0:8443</code></td><td>mTLS report listener bind address.</td></tr>
+            <tr><td><code>enroll_addr</code></td><td>string</td><td><code>0.0.0.0:8444</code></td><td>Bootstrap enrollment listener bind address.</td></tr>
+            <tr><td><code>advertise_host</code></td><td>string</td><td><code>127.0.0.1</code></td><td>Hostname/IP workers use to reach this manager; embedded as a certificate SAN.</td></tr>
+            <tr><td><code>api_listen_addr</code></td><td>string</td><td><code>127.0.0.1:8080</code></td><td>Local JSON API bind address. Must be loopback.</td></tr>
+            <tr><td><code>interval_seconds</code></td><td>int</td><td><code>60</code></td><td>Reporting interval pushed to workers.</td></tr>
+            <tr><td><code>enabled_checks</code></td><td>[]string</td><td>all five</td><td>Which checks workers should run — see <a href="#report-reference">report data reference</a> for names.</td></tr>
+            <tr><td><code>data_dir</code></td><td>string</td><td><code>/etc/sitrep/manager</code></td><td>Where the CA, server cert, and this file itself live.</td></tr>
+          </tbody>
+        </table>
+        </div>
+
+        <h3>Worker — <code>/etc/sitrep/worker/config.yaml</code></h3>
+        <div class="docs-table-scroll">
+<table class="docs-table">
+          <thead><tr><th>Field</th><th>Type</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>worker_id</code></td><td>string</td><td>Assigned by the worker itself at enrollment (e.g. <code>wkr_4a1f9c22</code>); also the client certificate's common name.</td></tr>
+            <tr><td><code>manager_addr</code></td><td>string</td><td>The manager's report address, <code>host:port</code>, from the enrollment response.</td></tr>
+            <tr><td><code>interval_seconds</code></td><td>int</td><td>Cached copy of the manager's last-pushed interval — rewritten whenever a report acknowledgement carries a different value.</td></tr>
+            <tr><td><code>enabled_checks</code></td><td>[]string</td><td>Cached copy of the manager's last-pushed enabled-checks list.</td></tr>
+            <tr><td><code>data_dir</code></td><td>string</td><td>Where the client cert, the manager's CA cert, and this file live.</td></tr>
+          </tbody>
+        </table>
+        </div>
+
+        <h3>On-disk layout</h3>
+        <div class="docs-table-scroll">
+<table class="docs-table">
+          <thead><tr><th>Path</th><th>Owner</th><th>Contents</th></tr></thead>
+          <tbody>
+            <tr><td><code>/etc/sitrep/manager/ca.{crt,key}.pem</code></td><td><code>sitrep</code></td><td>The manager's self-signed root CA.</td></tr>
+            <tr><td><code>/etc/sitrep/manager/server.{crt,key}.pem</code></td><td><code>sitrep</code></td><td>The manager's server certificate (auto-renewed within 30 days of expiry).</td></tr>
+            <tr><td><code>/etc/sitrep/worker/client.{crt,key}.pem</code></td><td><code>sitrep</code></td><td>This worker's client certificate.</td></tr>
+            <tr><td><code>/etc/sitrep/worker/ca.crt.pem</code></td><td><code>sitrep</code></td><td>The manager's CA certificate, for verifying the manager on report connections.</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p>All data directories are created <code>0700</code>; private keys are <code>0600</code>; certificates are <code>0644</code>.</p>
+      </section>
+
+      <section class="docs-section" id="report-reference">
+        <h2>Report data reference</h2>
+        <p>Every report is a JSON object with a worker ID, a hostname, an epoch-seconds timestamp, and a map of check name → result:</p>
+        <div class="code-block">
+          <pre><code>{
+  "worker_id": "wkr_4a1f9c22",
+  "hostname": "web-01",
+  "timestamp": 1767450300,
+  "stats": {
+    "internet": { "ok": true, "value": { "...": "..." } },
+    "disk":     { "ok": true, "value": { "...": "..." } }
+  }
+}</code></pre>
+        </div>
+        <p>Each entry in <code>stats</code> has an <code>ok</code> boolean; when <code>false</code>, it carries an <code>error</code> string instead of <code>value</code> — a check that failed to run (missing binary, timeout) is reported, not silently dropped. When <code>ok</code> is <code>true</code>, <code>value</code>'s shape depends on the check:</p>
+
+        <div class="docs-table-scroll">
+<table class="docs-table">
+          <thead><tr><th>Check</th><th><code>value</code> shape</th></tr></thead>
+          <tbody>
+            <tr><td><code>internet</code></td><td><code>{ reachable_ms: number, packet_loss: boolean }</code></td></tr>
+            <tr><td><code>disk</code></td><td><code>{ path: string, total_bytes: number, used_bytes: number, used_percent: number }</code></td></tr>
+            <tr><td><code>dram</code></td><td><code>{ total_bytes: number, used_bytes: number, used_percent: number }</code></td></tr>
+            <tr><td><code>cpu</code></td><td><code>{ used_percent: number }</code></td></tr>
+            <tr><td><code>gitauth</code></td><td><code>{ logged_in: boolean, account?: string }</code></td></tr>
+          </tbody>
+        </table>
+        </div>
+
+        <p>Checks run concurrently with an independent timeout each, so one slow or hung check (typically <code>internet</code>, if the network is unreachable) can't delay or block the others in the same report cycle.</p>
+      </section>
+
+      <section class="docs-section" id="local-api">
+        <h2>Local API</h2>
+        <p>Plain HTTP+JSON, bound strictly to loopback — no authentication or client certificate needed, since reaching it already requires running on the same machine as the manager.</p>
+
+        <h3><code>GET /v1/workers</code></h3>
+        <p>List every known worker.</p>
+        <div class="code-block">
+          <pre><code>curl http://127.0.0.1:8080/v1/workers</code></pre>
+        </div>
+        <div class="code-block">
+          <pre><code>[
+  { "id": "wkr_4a1f9c22", "hostname": "web-01", "enrolled_at": 1767450000, "last_seen": 1767450300 }
+]</code></pre>
+        </div>
+
+        <h3><code>GET /v1/workers/{id}</code></h3>
+        <p>A single worker plus its most recent report (see <a href="#report-reference">report data reference</a> for the shape). Returns <code>404</code> if the ID is unknown.</p>
+
+        <h3><code>GET /v1/config</code></h3>
+        <p>The manager's current live configuration.</p>
+        <div class="code-block">
+          <pre><code>curl http://127.0.0.1:8080/v1/config</code></pre>
+        </div>
+        <div class="code-block">
+          <pre><code>{
+  "listen_addr": "0.0.0.0:8443",
+  "api_listen_addr": "127.0.0.1:8080",
+  "interval_seconds": 60,
+  "enabled_checks": ["internet", "disk", "dram", "cpu", "gitauth"]
+}</code></pre>
+        </div>
+
+        <h3><code>PATCH /v1/config</code></h3>
+        <p>Update the reporting interval and/or enabled checks. Omitted fields are left unchanged. Persisted to <code>config.yaml</code> immediately and rolled out to every enrolled worker within one reporting interval — no manager restart, no per-worker action.</p>
+        <div class="code-block">
+          <pre><code>curl -X PATCH http://127.0.0.1:8080/v1/config \
+  -d '{"interval_seconds": 30, "enabled_checks": ["disk", "cpu"]}'</code></pre>
+        </div>
+        <p>Returns the updated config. <code>interval_seconds</code> must be positive — a zero or negative value returns <code>400</code>.</p>
+
+        <h3><code>POST /v1/tokens</code></h3>
+        <p>Create a one-time worker enrollment token — this is what <code>sitrep manager token create</code> calls. Useful directly if you're scripting worker provisioning.</p>
+        <div class="code-block">
+          <pre><code>curl -X POST http://127.0.0.1:8080/v1/tokens -d '{"ttl_seconds": 3600}'</code></pre>
+        </div>
+        <div class="code-block">
+          <pre><code>{
+  "token": "sitrep_3f9a...",
+  "expires_at": 1767453600,
+  "enroll_addr": "10.0.0.5:8444",
+  "server_cert_fingerprint": "8f2c1e..."
+}</code></pre>
+        </div>
+        <p><code>ttl_seconds</code> is optional and defaults to 15 minutes.</p>
+      </section>
+
+      <section class="docs-section" id="services">
+        <h2>Managing the services</h2>
+        <div class="code-block">
+          <div class="code-block-head">
+            <span>systemd</span>
+            <button class="copy-btn" type="button" data-copy-target="code-systemd">copy</button>
+          </div>
+          <pre><code id="code-systemd">systemctl status sitrep-manager      # or sitrep-worker
+systemctl restart sitrep-manager
+journalctl -u sitrep-manager -f      # follow logs</code></pre>
+        </div>
+        <p><code>sitrep manager status</code> / <code>sitrep worker status</code> are thin wrappers around <code>systemctl is-active</code> for convenience — same information, one fewer thing to remember the unit name for.</p>
+        <p>To re-run setup from scratch on a machine: stop the service, remove its data directory (<code>/etc/sitrep/manager</code> or <code>/etc/sitrep/worker</code>), and run <code>sitrep manager start</code> / <code>sitrep worker start</code> again.</p>
+      </section>
+
+      <section class="docs-section" id="troubleshooting">
+        <h2>Troubleshooting</h2>
+
+        <h3>Worker enrollment fails with "invalid or expired enrollment token"</h3>
+        <p>The token was already used, has expired (15 minutes by default), or the manager restarted after it was created — tokens are held in memory only. Generate a new one with <code>sitrep manager token create</code> and retry.</p>
+
+        <h3>Worker enrollment fails with a TLS/certificate error</h3>
+        <p>Double check the certificate fingerprint was copied exactly from <code>token create</code>'s output. The worker pins that specific fingerprint for the one bootstrap connection; a mismatch — including a stale fingerprint from a manager that's since regenerated its server certificate — is rejected outright rather than silently trusted.</p>
+
+        <h3><code>PATCH /v1/config</code> returns 400</h3>
+        <p><code>interval_seconds</code> must be a positive integer. Everything else about the patch is otherwise applied field-by-field; omitted fields are left as-is.</p>
+
+        <h3>systemd shows the service as <code>failed</code></h3>
+        <p>Check <code>journalctl -u sitrep-manager</code> (or <code>sitrep-worker</code>) for the actual error. The most common cause on a manager is one of its three ports (report, enroll, local API) already in use by something else — the wizard doesn't check for port conflicts ahead of time.</p>
+
+        <h3>A specific check always reports an error</h3>
+        <p>For <code>internet</code>/<code>gitauth</code>, confirm the underlying binary (<code>ping</code>/<code>gh</code>) is actually on <code>PATH</code> for the user the systemd service runs as (<code>sitrep</code>, not necessarily your own login shell's <code>PATH</code>). The worker wizard's dependency check runs once, at setup time — installing a dependency afterward doesn't require re-enrollment, just restart the worker service.</p>
+      </section>
+
+      <section class="docs-section" id="tradeoffs">
+        <h2>Design tradeoffs</h2>
+        <p>Deliberate, not oversights — worth knowing before you rely on any of these:</p>
+
+        <h3>Enrollment tokens are in-memory only</h3>
+        <p>A manager restart invalidates any outstanding, unused token. Tokens that have already been consumed are unaffected — enrolled workers keep working. The fix for a stale token is just generating a new one.</p>
+
+        <h3>No automated certificate rotation</h3>
+        <p>The CA is valid 10 years. The manager's server certificate is valid 2 years and silently auto-renewed on startup within 30 days of expiry. Worker client certificates are valid 1 year with <strong>no</strong> auto-renewal — an expired one simply fails its next mTLS handshake, and the fix is re-enrolling that worker with a fresh token, not a background renewal protocol.</p>
+
+        <h3>No persistent report history</h3>
+        <p>The manager holds only each worker's <em>latest</em> report, in memory. This is a live-status view, not a trend store — restarting the manager clears it. If you need history, poll <code>GET /v1/workers/{id}</code> from your own tooling and store it yourself.</p>
+      </section>
+
+      <section class="docs-section" id="development">
+        <h2>Development</h2>
+        <div class="code-block">
+          <div class="code-block-head">
+            <span>make</span>
+            <button class="copy-btn" type="button" data-copy-target="code-dev">copy</button>
+          </div>
+          <pre><code id="code-dev">make build   # bin/sitrep for the host platform (dev/test convenience)
+make linux   # cross-compiled bin/sitrep-linux-{amd64,arm64} — what you ship
+make test    # go test ./...
+make vet     # go vet ./...
+make fmt     # gofmt -l . (lists any unformatted files)</code></pre>
+        </div>
+        <p><code>go test ./...</code> covers PKI/certificate issuance, the enrollment token store, all five stat checkers, the mTLS handshake itself (client-cert required vs. not, fingerprint pinning), the worker registry under <code>-race</code>, and the local API's handlers. Actually installing systemd units — <code>useradd</code>, <code>apt</code>/<code>dnf</code>/<code>pacman</code> — is Linux-only and can only be exercised on a real Linux host, VM, or systemd-enabled container, not in <code>go test</code>.</p>
+
+        <h3>Manual end-to-end check</h3>
+        <ol>
+          <li><code>sudo sitrep manager start</code> → wizard → <code>systemctl status sitrep-manager</code> should be <code>active</code>.</li>
+          <li><code>sudo sitrep manager token create</code> → copy the four printed values.</li>
+          <li>On the same or another machine, <code>sudo sitrep worker start</code> → wizard → <code>systemctl status sitrep-worker</code> should be <code>active</code>.</li>
+          <li>After one interval: <code>curl http://127.0.0.1:8080/v1/workers</code> on the manager should show the worker with a fresh <code>last_report</code>.</li>
+        </ol>
+      </section>
+
+    </div>
+  </div>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <p class="wordmark small">SITREP</p>
+      <p class="footer-status" id="footer-status">manager: active · this page has been up for 00:00:00</p>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="index.html">Home</a>
+      <a href="https://github.com/justwaters/Sitrep">GitHub</a>
+      <a href="https://github.com/justwaters/Sitrep/issues">Issues</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="script.js" defer></script>
+</body>
+</html>

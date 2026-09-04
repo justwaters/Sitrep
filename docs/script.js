@@ -161,4 +161,39 @@
       });
     });
   });
+
+  /* ---------------------------------------------------------------
+     Docs sidebar scroll-spy — highlights the section currently in
+     view. Falls back to no highlighting (still fully navigable via
+     the links themselves) if IntersectionObserver is unavailable.
+     --------------------------------------------------------------- */
+  var tocLinks = document.querySelectorAll("#docs-toc a");
+  var docsSections = document.querySelectorAll(".docs-section[id]");
+
+  if (tocLinks.length && docsSections.length && "IntersectionObserver" in window) {
+    var linkById = {};
+    tocLinks.forEach(function (link) {
+      linkById[link.getAttribute("href").slice(1)] = link;
+    });
+
+    var tocObserver = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          var link = linkById[entry.target.id];
+          if (!link) return;
+          if (entry.isIntersecting) {
+            tocLinks.forEach(function (l) {
+              l.classList.remove("active");
+            });
+            link.classList.add("active");
+          }
+        });
+      },
+      { rootMargin: "-96px 0px -70% 0px", threshold: 0 }
+    );
+
+    docsSections.forEach(function (section) {
+      tocObserver.observe(section);
+    });
+  }
 })();
