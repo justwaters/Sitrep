@@ -1,0 +1,19 @@
+[Unit]
+Description=Sitrep Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart={{.BinaryPath}} worker start --foreground --config {{.ConfigPath}}
+Restart=on-failure
+RestartSec=5
+User=sitrep
+Group=sitrep
+AmbientCapabilities=CAP_NET_RAW
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths={{.DataDir}}
+
+[Install]
+WantedBy=multi-user.target
