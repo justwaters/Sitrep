@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sitrep — a status report from every machine you run</title>
+<meta name="description" content="Sitrep is a manager and worker agent for Linux fleets. Workers enroll once with a one-time token, then report disk, memory, CPU, connectivity, and git auth status over mutual TLS the manager issues itself.">
+<meta property="og:title" content="Sitrep — a status report from every machine you run">
+<meta property="og:description" content="A manager and worker agent for Linux fleets, secured with mutual TLS the manager issues itself. No external PKI, no cloud dependency.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0A0E12">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%230A0E12'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23F5B448'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="#top" class="wordmark">SITREP<span class="cursor" aria-hidden="true">_</span></a>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="#how-it-works">How it works</a>
+      <a href="#checks">Checks</a>
+      <a href="#api">API</a>
+      <a href="https://github.com/justwaters/Sitrep" class="nav-github">GitHub ↗</a>
+    </nav>
+    <div class="clock" aria-hidden="true">
+      <span id="epoch-clock">0000000000</span>
+      <span class="clock-label">utc epoch</span>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero" id="top">
+    <div class="hero-inner">
+      <div class="hero-copy">
+        <p class="eyebrow">open source · linux · mTLS</p>
+        <h1>A status report from every machine you run.</h1>
+        <p class="lede">Sitrep pairs a manager with any number of worker agents. Workers enroll once with a one-time token, then report disk, memory, CPU, connectivity, and git auth status on an interval the manager controls — all of it over mutual TLS the manager issues itself.</p>
+        <div class="cta-row">
+          <a href="#quickstart" class="btn btn-primary">Get started</a>
+          <a href="https://github.com/justwaters/Sitrep" class="btn btn-ghost">View source ↗</a>
+        </div>
+      </div>
+
+      <div class="board-wrap">
+        <div class="board-frame">
+          <div class="board-head">
+            <span class="board-title"><span class="dot dot-ok" aria-hidden="true"></span>example fleet</span>
+            <span class="board-sub">sample output — install locally to see your own</span>
+          </div>
+          <div class="board-scroll">
+            <table class="board" aria-label="Example worker status board">
+              <thead>
+                <tr>
+                  <th scope="col">host</th>
+                  <th scope="col">ping</th>
+                  <th scope="col">disk</th>
+                  <th scope="col">cpu</th>
+                  <th scope="col">git</th>
+                  <th scope="col">last report</th>
+                </tr>
+              </thead>
+              <tbody id="board-body">
+                <tr data-interval="20">
+                  <td class="c-host"><span class="dot dot-ok" aria-hidden="true"></span>web-01</td>
+                  <td class="c-ping">14ms</td>
+                  <td class="c-disk">41%</td>
+                  <td class="c-cpu">12%</td>
+                  <td class="c-git ok">✓</td>
+                  <td class="c-seen">6s ago</td>
+                </tr>
+                <tr data-interval="25">
+                  <td class="c-host"><span class="dot dot-warn" aria-hidden="true"></span>db-03</td>
+                  <td class="c-ping">22ms</td>
+                  <td class="c-disk warn">68%</td>
+                  <td class="c-cpu">55%</td>
+                  <td class="c-git ok">✓</td>
+                  <td class="c-seen">11s ago</td>
+                </tr>
+                <tr data-interval="18">
+                  <td class="c-host"><span class="dot dot-fail" aria-hidden="true"></span>edge-07</td>
+                  <td class="c-ping">9ms</td>
+                  <td class="c-disk">22%</td>
+                  <td class="c-cpu">8%</td>
+                  <td class="c-git fail">✗</td>
+                  <td class="c-seen">3s ago</td>
+                </tr>
+                <tr data-interval="30">
+                  <td class="c-host"><span class="dot dot-warn" aria-hidden="true"></span>build-02</td>
+                  <td class="c-ping">31ms</td>
+                  <td class="c-disk warn">77%</td>
+                  <td class="c-cpu warn">64%</td>
+                  <td class="c-git ok">✓</td>
+                  <td class="c-seen">17s ago</td>
+                </tr>
+                <tr data-interval="15">
+                  <td class="c-host"><span class="dot dot-ok" aria-hidden="true"></span>cache-11</td>
+                  <td class="c-ping">6ms</td>
+                  <td class="c-disk">15%</td>
+                  <td class="c-cpu">4%</td>
+                  <td class="c-git ok">✓</td>
+                  <td class="c-seen">2s ago</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tradeoffs-strip" aria-label="Built deliberately">
+    <div class="strip-inner">
+      <p><span class="dot dot-ok" aria-hidden="true"></span>no external PKI</p>
+      <p><span class="dot dot-ok" aria-hidden="true"></span>no cloud dependency</p>
+      <p><span class="dot dot-warn" aria-hidden="true"></span>no persistent history <span class="fog">— by design</span></p>
+      <p><span class="dot dot-ok" aria-hidden="true"></span>single go binary</p>
+    </div>
+  </section>
+
+  <section class="section" id="how-it-works">
+    <div class="section-inner">
+      <p class="eyebrow reveal">how it works</p>
+      <h2 class="reveal">Four commands, in order.</h2>
+      <ol class="steps">
+        <li class="step">
+          <span class="step-index">01</span>
+          <div class="step-body">
+            <h3>Start the manager</h3>
+            <p>Pick which checks to enable and how often workers should report. Sitrep generates its own certificate authority and installs itself as a systemd service.</p>
+            <code>sudo sitrep manager start</code>
+          </div>
+        </li>
+        <li class="step">
+          <span class="step-index">02</span>
+          <div class="step-body">
+            <h3>Create a token</h3>
+            <p>A one-time, expiring token — plus the manager's certificate fingerprint — is everything a new worker needs to enroll.</p>
+            <code>sudo sitrep manager token create</code>
+          </div>
+        </li>
+        <li class="step">
+          <span class="step-index">03</span>
+          <div class="step-body">
+            <h3>Enroll a worker</h3>
+            <p>The worker presents the token once, over a connection pinned to that fingerprint, and gets a signed client certificate back.</p>
+            <code>sudo sitrep worker start</code>
+          </div>
+        </li>
+        <li class="step">
+          <span class="step-index">04</span>
+          <div class="step-body">
+            <h3>Reports roll in</h3>
+            <p>Every report is mutual TLS, on the manager's interval, queryable over a local JSON API — no further setup per worker.</p>
+            <code>curl 127.0.0.1:8080/v1/workers</code>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section alt" id="checks">
+    <div class="section-inner">
+      <p class="eyebrow reveal">what gets checked</p>
+      <h2 class="reveal">Five checks, each one optional.</h2>
+      <div class="checks-grid">
+        <article class="check-card">
+          <h3>Internet Access</h3>
+          <p>Pings 8.8.8.8 and records reachability and round-trip latency.</p>
+          <span class="check-key">internet</span>
+        </article>
+        <article class="check-card">
+          <h3>Disk Space</h3>
+          <p>Total, used, and percent-used for the root filesystem.</p>
+          <span class="check-key">disk</span>
+        </article>
+        <article class="check-card">
+          <h3>DRAM Usage</h3>
+          <p>Total and used system memory, sampled at report time.</p>
+          <span class="check-key">dram</span>
+        </article>
+        <article class="check-card">
+          <h3>CPU Usage</h3>
+          <p>Aggregate utilization, sampled over a short window.</p>
+          <span class="check-key">cpu</span>
+        </article>
+        <article class="check-card">
+          <h3>Git Auth Status</h3>
+          <p>Runs <code>gh auth status</code> and reports the signed-in account.</p>
+          <span class="check-key">gitauth</span>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="security">
+    <div class="section-inner">
+      <p class="eyebrow reveal">security</p>
+      <h2 class="reveal">Two ports. One CA. No external PKI.</h2>
+      <p class="section-lede">The manager generates its own certificate authority the first time it starts — no cert manager, no Vault, no manual OpenSSL. Workers enroll once, over a connection pinned to the manager's certificate fingerprint, and get a signed client certificate back. Every report after that is mutual TLS: the worker verifies the manager, the manager verifies the worker, and a report's claimed worker ID is checked against the certificate that actually sent it.</p>
+
+      <div class="diagram" role="img" aria-label="Diagram: worker connects once to the enrollment port to get a certificate, then reports repeatedly to the report port over mutual TLS, and the manager exposes results on a local API port">
+        <div class="diagram-node">
+          <span class="diagram-label">worker</span>
+        </div>
+        <div class="diagram-flow">
+          <span class="diagram-arrow">enroll once, over a pinned connection</span>
+          <div class="diagram-node port">
+            <span class="diagram-label">:8444</span>
+            <span class="diagram-sub">no client cert required</span>
+          </div>
+        </div>
+        <div class="diagram-flow">
+          <span class="diagram-arrow">report on interval, mutual TLS</span>
+          <div class="diagram-node port">
+            <span class="diagram-label">:8443</span>
+            <span class="diagram-sub">RequireAndVerifyClientCert</span>
+          </div>
+        </div>
+        <div class="diagram-flow">
+          <span class="diagram-arrow">query results</span>
+          <div class="diagram-node port">
+            <span class="diagram-label">127.0.0.1:8080</span>
+            <span class="diagram-sub">local json api, loopback only</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section alt" id="api">
+    <div class="section-inner">
+      <p class="eyebrow reveal">local api</p>
+      <h2 class="reveal">Your fleet, queryable in one curl.</h2>
+      <p class="section-lede">The manager exposes a loopback-only JSON API so other software on the same host can read live status without ever touching a certificate.</p>
+      <div class="api-grid">
+        <div class="api-row"><code>GET /v1/workers</code><span>List every enrolled worker.</span></div>
+        <div class="api-row"><code>GET /v1/workers/{id}</code><span>A single worker's most recent report.</span></div>
+        <div class="api-row"><code>GET /v1/config</code><span>Current reporting interval and enabled checks.</span></div>
+        <div class="api-row"><code>PATCH /v1/config</code><span>Change the interval or checks — rolls out fleet-wide within one interval.</span></div>
+        <div class="api-row"><code>POST /v1/tokens</code><span>Create a one-time worker enrollment token.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section quickstart" id="quickstart">
+    <div class="section-inner">
+      <p class="eyebrow reveal">install</p>
+      <h2 class="reveal">Build it, ship it, run it.</h2>
+
+      <div class="code-block">
+        <div class="code-block-head">
+          <span>build</span>
+          <button class="copy-btn" type="button" data-copy-target="code-build">copy</button>
+        </div>
+        <pre><code id="code-build">git clone https://github.com/justwaters/Sitrep.git
+cd Sitrep
+make linux</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-head">
+          <span>run</span>
+          <button class="copy-btn" type="button" data-copy-target="code-run">copy</button>
+        </div>
+        <pre><code id="code-run">sudo sitrep manager start
+sudo sitrep manager token create
+sudo sitrep worker start</code></pre>
+      </div>
+
+      <p class="quickstart-note">Requires Linux with systemd. Full walkthrough, config reference, and API docs live in the <a href="https://github.com/justwaters/Sitrep#readme">README</a>.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <p class="wordmark small">SITREP</p>
+      <p class="footer-status" id="footer-status">manager: active · this page has been up for 00:00:00</p>
+    </div>
+    <nav class="footer-links" aria-label="Footer">
+      <a href="https://github.com/justwaters/Sitrep">GitHub</a>
+      <a href="https://github.com/justwaters/Sitrep#readme">README</a>
+      <a href="https://github.com/justwaters/Sitrep/issues">Issues</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="script.js" defer></script>
+</body>
+</html>
