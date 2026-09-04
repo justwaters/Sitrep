@@ -9,7 +9,7 @@ import "github.com/justwaters/sitrep/internal/transport"
 // WorkerSummary is the list-view shape for GET /v1/workers.
 type WorkerSummary struct {
 	ID         string `json:"id"`
-	Hostname   string `json:"hostname"`
+	Name       string `json:"name"`
 	EnrolledAt int64  `json:"enrolled_at"`
 	LastSeen   int64  `json:"last_seen"`
 }
@@ -24,6 +24,7 @@ type WorkerDetail struct {
 // ConfigResponse is the shape for GET /v1/config and the response to a
 // successful PATCH /v1/config.
 type ConfigResponse struct {
+	Name            string   `json:"name"`
 	ListenAddr      string   `json:"listen_addr"`
 	APIListenAddr   string   `json:"api_listen_addr"`
 	IntervalSeconds int      `json:"interval_seconds"`
@@ -53,4 +54,5 @@ type TokenCreateResponse struct {
 	ExpiresAt             int64  `json:"expires_at"`
 	EnrollAddr            string `json:"enroll_addr"`
 	ServerCertFingerprint string `json:"server_cert_fingerprint"`
+	ManagerName           string `json:"manager_name"`
 }

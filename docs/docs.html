@@ -159,6 +159,7 @@ ssh myhost 'sudo install -m 0755 /tmp/sitrep /usr/local/bin/sitrep'</code></pre>
         </div>
         <p>With no existing config, this launches a one-time interactive wizard:</p>
         <ol>
+          <li><strong>What do you want to call this machine?</strong> — the manager's name, embedded in its CA and server certificate's common name and shown wherever the manager identifies itself (e.g. <code>token create</code> output).</li>
           <li><strong>Report listen address</strong> — mTLS, default <code>0.0.0.0:8443</code>. Where workers send reports.</li>
           <li><strong>Enrollment listen address</strong> — mTLS bootstrap, default <code>0.0.0.0:8444</code>. Where workers enroll.</li>
           <li><strong>Advertised address</strong> — the hostname or IP workers should use to reach this manager. Embedded as a SAN in the manager's server certificate and printed by <code>token create</code>.</li>
@@ -182,7 +183,7 @@ ssh myhost 'sudo install -m 0755 /tmp/sitrep /usr/local/bin/sitrep'</code></pre>
         </div>
         <p>This prints four values the worker operator needs — the manager's enrollment address, the token itself, its expiry, and the manager's server certificate fingerprint:</p>
         <div class="code-block">
-          <pre><code>Enrollment token created. Give the worker operator all four of these values:
+          <pre><code>Enrollment token created for manager "prod-manager". Give the worker operator all four of these values:
   Manager address:  10.0.0.5:8444
   Token:            sitrep_3f9a...
   Expires:          2026-09-03T15:32:10Z
@@ -196,7 +197,7 @@ ssh myhost 'sudo install -m 0755 /tmp/sitrep /usr/local/bin/sitrep'</code></pre>
           </div>
           <pre><code id="code-worker-setup">sudo sitrep worker start</code></pre>
         </div>
-        <p>The wizard checks for <code>ping</code>/<code>gh</code>, offering to install whichever is missing; asks for the manager address, token, and certificate fingerprint; performs the enrollment handshake; writes <code>/etc/sitrep/worker/config.yaml</code> plus the issued client certificate and the manager's CA certificate; and installs and starts <code>sitrep-worker.service</code>. The worker begins reporting immediately, at the interval the manager pushed during enrollment.</p>
+        <p>The wizard asks what to call this machine — the name the manager will report it under; checks for <code>ping</code>/<code>gh</code>, offering to install whichever is missing; asks for the manager address, token, and certificate fingerprint; performs the enrollment handshake; writes <code>/etc/sitrep/worker/config.yaml</code> plus the issued client certificate and the manager's CA certificate; and installs and starts <code>sitrep-worker.service</code>. The worker begins reporting immediately, at the interval the manager pushed during enrollment.</p>
         <p>Under the hood: the worker generates its own keypair and a certificate signing request locally — the private key never leaves the worker. It presents that CSR plus the token over a TLS connection pinned to the fingerprint above; the manager validates the token, signs the CSR, and returns the resulting client certificate along with its own CA certificate and current config.</p>
       </section>
 
@@ -258,6 +259,7 @@ ssh myhost 'sudo install -m 0755 /tmp/sitrep /usr/local/bin/sitrep'</code></pre>
 <table class="docs-table">
           <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
           <tbody>
+            <tr><td><code>name</code></td><td>string</td><td>—</td><td>Operator-chosen at setup; embedded in the CA and server certificate common names.</td></tr>
             <tr><td><code>listen_addr</code></td><td>string</td><td><code>0.0.0.0:8443</code></td><td>mTLS report listener bind address.</td></tr>
             <tr><td><code>enroll_addr</code></td><td>string</td><td><code>0.0.0.0:8444</code></td><td>Bootstrap enrollment listener bind address.</td></tr>
             <tr><td><code>advertise_host</code></td><td>string</td><td><code>127.0.0.1</code></td><td>Hostname/IP workers use to reach this manager; embedded as a certificate SAN.</td></tr>
@@ -274,6 +276,7 @@ ssh myhost 'sudo install -m 0755 /tmp/sitrep /usr/local/bin/sitrep'</code></pre>
 <table class="docs-table">
           <thead><tr><th>Field</th><th>Type</th><th>Meaning</th></tr></thead>
           <tbody>
+            <tr><td><code>name</code></td><td>string</td><td>Operator-chosen at setup; sent as <code>Report.name</code> on every check-in.</td></tr>
             <tr><td><code>worker_id</code></td><td>string</td><td>Assigned by the worker itself at enrollment (e.g. <code>wkr_4a1f9c22</code>); also the client certificate's common name.</td></tr>
             <tr><td><code>manager_addr</code></td><td>string</td><td>The manager's report address, <code>host:port</code>, from the enrollment response.</td></tr>
             <tr><td><code>interval_seconds</code></td><td>int</td><td>Cached copy of the manager's last-pushed interval — rewritten whenever a report acknowledgement carries a different value.</td></tr>
@@ -300,11 +303,11 @@ ssh myhost 'sudo install -m 0755 /tmp/sitrep /usr/local/bin/sitrep'</code></pre>
 
       <section class="docs-section" id="report-reference">
         <h2>Report data reference</h2>
-        <p>Every report is a JSON object with a worker ID, a hostname, an epoch-seconds timestamp, and a map of check name → result:</p>
+        <p>Every report is a JSON object with a worker ID, the operator-chosen name for that machine, an epoch-seconds timestamp, and a map of check name → result:</p>
         <div class="code-block">
           <pre><code>{
   "worker_id": "wkr_4a1f9c22",
-  "hostname": "web-01",
+  "name": "web-01",
   "timestamp": 1767450300,
   "stats": {
     "internet": { "ok": true, "value": { "...": "..." } },
@@ -341,7 +344,7 @@ ssh myhost 'sudo install -m 0755 /tmp/sitrep /usr/local/bin/sitrep'</code></pre>
         </div>
         <div class="code-block">
           <pre><code>[
-  { "id": "wkr_4a1f9c22", "hostname": "web-01", "enrolled_at": 1767450000, "last_seen": 1767450300 }
+  { "id": "wkr_4a1f9c22", "name": "web-01", "enrolled_at": 1767450000, "last_seen": 1767450300 }
 ]</code></pre>
         </div>
 
@@ -355,6 +358,7 @@ ssh myhost 'sudo install -m 0755 /tmp/sitrep /usr/local/bin/sitrep'</code></pre>
         </div>
         <div class="code-block">
           <pre><code>{
+  "name": "prod-manager",
   "listen_addr": "0.0.0.0:8443",
   "api_listen_addr": "127.0.0.1:8080",
   "interval_seconds": 60,
@@ -380,7 +384,8 @@ ssh myhost 'sudo install -m 0755 /tmp/sitrep /usr/local/bin/sitrep'</code></pre>
   "token": "sitrep_3f9a...",
   "expires_at": 1767453600,
   "enroll_addr": "10.0.0.5:8444",
-  "server_cert_fingerprint": "8f2c1e..."
+  "server_cert_fingerprint": "8f2c1e...",
+  "manager_name": "prod-manager"
 }</code></pre>
         </div>
         <p><code>ttl_seconds</code> is optional and defaults to 15 minutes.</p>

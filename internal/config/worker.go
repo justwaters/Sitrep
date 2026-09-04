@@ -14,6 +14,10 @@ import (
 // EnrollResponse or ReportAck): on restart the worker resumes reporting
 // with the last-known-good config before it has re-contacted the manager.
 type WorkerConfig struct {
+	// Name is what this machine is called, chosen by the operator during
+	// setup and reported to the manager on every check-in — see
+	// transport.Report.Name.
+	Name            string             `yaml:"name"`
 	WorkerID        transport.WorkerID `yaml:"worker_id"`
 	ManagerAddr     string             `yaml:"manager_addr"`
 	IntervalSeconds int                `yaml:"interval_seconds"`

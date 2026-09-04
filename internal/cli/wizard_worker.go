@@ -41,8 +41,16 @@ func runWorkerWizard(cmd *cobra.Command, dataDir, configPath string) (*config.Wo
 		}
 	}
 
+	name := defaultMachineName()
 	var managerAddr, tok, fingerprint string
 	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("What do you want to call this machine?").
+				Description("This is how the manager will identify it in reports.").
+				Value(&name).
+				Validate(requireNonEmpty),
+		),
 		huh.NewGroup(
 			huh.NewNote().
 				Title("Link to a manager").
@@ -61,6 +69,7 @@ func runWorkerWizard(cmd *cobra.Command, dataDir, configPath string) (*config.Wo
 	defer cancel()
 
 	cfg, err := worker.Enroll(ctx, worker.EnrollParams{
+		Name:          name,
 		ManagerAddr:   managerAddr,
 		Token:         tok,
 		CAFingerprint: fingerprint,
@@ -69,7 +78,7 @@ func runWorkerWizard(cmd *cobra.Command, dataDir, configPath string) (*config.Wo
 	if err != nil {
 		return nil, fmt.Errorf("enrollment failed: %w", err)
 	}
-	fmt.Fprintf(out, "Enrolled as worker %s.\n", cfg.WorkerID)
+	fmt.Fprintf(out, "Enrolled as %q (worker %s).\n", cfg.Name, cfg.WorkerID)
 
 	fmt.Fprintln(out, "\nInstalling the sitrep-worker systemd service...")
 	if err := sysd.EnsureSystemUser(); err != nil {
@@ -96,7 +105,7 @@ func runWorkerWizard(cmd *cobra.Command, dataDir, configPath string) (*config.Wo
 		return nil, fmt.Errorf("install systemd service: %w", err)
 	}
 
-	fmt.Fprintf(out, "\nDone. The worker is now reporting in the background as %s.\n", sysd.WorkerUnitName)
+	fmt.Fprintf(out, "\nDone. %q is now reporting in the background as %s.\n", cfg.Name, sysd.WorkerUnitName)
 	fmt.Fprintf(out, "Check its status any time with: systemctl status %s\n", sysd.WorkerUnitName)
 
 	return cfg, nil

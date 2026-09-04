@@ -96,13 +96,14 @@ sudo sitrep manager start
 
 This is a one-time interactive wizard:
 
-1. Confirm or edit the listen addresses:
+1. **What do you want to call this machine?** — the manager's name, embedded in its CA and server certificate and shown in `token create` output.
+2. Confirm or edit the listen addresses:
    - **Report listen address** (mTLS, default `0.0.0.0:8443`) — where workers send reports
    - **Enrollment listen address** (mTLS bootstrap, default `0.0.0.0:8444`) — where workers enroll
    - **Advertised address** — the hostname/IP workers should use to reach this manager (embedded in the server certificate's SANs and printed by `token create`)
    - **Local query API address** (default `127.0.0.1:8080`) — must be a loopback address
-2. Choose which checks to enable (all five by default)
-3. Set the reporting interval (Go duration syntax, e.g. `30s`, `1m`, `5m`)
+3. Choose which checks to enable (all five by default)
+4. Set the reporting interval (Go duration syntax, e.g. `30s`, `1m`, `5m`)
 
 The wizard then creates the `sitrep` system user, writes `/etc/sitrep/manager/config.yaml`, and installs + starts `sitrep-manager.service`. The manager generates its CA and server certificate itself on first actual startup (as the `sitrep` user).
 
@@ -123,7 +124,7 @@ sudo sitrep manager token create
 ```
 
 ```
-Enrollment token created. Give the worker operator all four of these values:
+Enrollment token created for manager "prod-manager". Give the worker operator all four of these values:
   Manager address:  10.0.0.5:8444
   Token:            sitrep_3f9a...
   Expires:          2026-09-03T15:32:10Z
@@ -140,10 +141,11 @@ sudo sitrep worker start
 
 The wizard:
 
-1. Checks for `ping`/`gh` and, if either is missing, shows the exact install command for your distro's package manager (`apt`/`dnf`/`pacman`) and only runs it on explicit confirmation — nothing is installed silently.
-2. Asks for the manager address, token, and certificate fingerprint from the previous step.
-3. Performs the enrollment handshake, writes `/etc/sitrep/worker/config.yaml` plus the issued client certificate and the manager's CA certificate.
-4. Installs and starts `sitrep-worker.service`.
+1. Asks **what you want to call this machine** — this is the name the manager will report it under.
+2. Checks for `ping`/`gh` and, if either is missing, shows the exact install command for your distro's package manager (`apt`/`dnf`/`pacman`) and only runs it on explicit confirmation — nothing is installed silently.
+3. Asks for the manager address, token, and certificate fingerprint from the previous step.
+4. Performs the enrollment handshake, writes `/etc/sitrep/worker/config.yaml` plus the issued client certificate and the manager's CA certificate.
+5. Installs and starts `sitrep-worker.service`.
 
 The worker begins reporting immediately at the interval the manager pushed at enrollment, and will pick up any later interval/check changes automatically.
 
@@ -163,7 +165,7 @@ curl http://127.0.0.1:8080/v1/workers
 [
   {
     "id": "wkr_3f9ab2c1d4e5f6a7",
-    "hostname": "web-01",
+    "name": "web-01",
     "enrolled_at": 1767450000,
     "last_seen": 1767450300
   }
@@ -181,12 +183,12 @@ curl http://127.0.0.1:8080/v1/workers/wkr_3f9ab2c1d4e5f6a7
 ```json
 {
   "id": "wkr_3f9ab2c1d4e5f6a7",
-  "hostname": "web-01",
+  "name": "web-01",
   "enrolled_at": 1767450000,
   "last_seen": 1767450300,
   "last_report": {
     "worker_id": "wkr_3f9ab2c1d4e5f6a7",
-    "hostname": "web-01",
+    "name": "web-01",
     "timestamp": 1767450300,
     "stats": {
       "internet": { "ok": true, "value": { "reachable_ms": 14, "packet_loss": false } },
@@ -211,6 +213,7 @@ curl http://127.0.0.1:8080/v1/config
 
 ```json
 {
+  "name": "prod-manager",
   "listen_addr": "0.0.0.0:8443",
   "api_listen_addr": "127.0.0.1:8080",
   "interval_seconds": 60,
@@ -242,7 +245,8 @@ curl -X POST http://127.0.0.1:8080/v1/tokens -d '{"ttl_seconds": 3600}'
   "token": "sitrep_3f9a...",
   "expires_at": 1767453600,
   "enroll_addr": "10.0.0.5:8444",
-  "server_cert_fingerprint": "8f2c1e..."
+  "server_cert_fingerprint": "8f2c1e...",
+  "manager_name": "prod-manager"
 }
 ```
 

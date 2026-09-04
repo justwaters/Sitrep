@@ -29,7 +29,7 @@ func newTestHandler(t *testing.T) (*api.Handler, string) {
 
 func TestListWorkers(t *testing.T) {
 	h, _ := newTestHandler(t)
-	h.Registry.Upsert(&transport.Report{WorkerID: "wkr_1", Hostname: "host1", Timestamp: 1})
+	h.Registry.Upsert(&transport.Report{WorkerID: "wkr_1", Name: "host1", Timestamp: 1})
 
 	srv := httptest.NewServer(h.Mux())
 	defer srv.Close()
@@ -69,7 +69,7 @@ func TestGetWorker_NotFound(t *testing.T) {
 
 func TestGetWorker_Found(t *testing.T) {
 	h, _ := newTestHandler(t)
-	h.Registry.Upsert(&transport.Report{WorkerID: "wkr_1", Hostname: "host1", Timestamp: 42})
+	h.Registry.Upsert(&transport.Report{WorkerID: "wkr_1", Name: "host1", Timestamp: 42})
 
 	srv := httptest.NewServer(h.Mux())
 	defer srv.Close()

@@ -5,7 +5,6 @@ package worker
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/justwaters/sitrep/internal/config"
 	"github.com/justwaters/sitrep/internal/pki"
@@ -15,6 +14,10 @@ import (
 // EnrollParams are the inputs the worker setup wizard collects from the
 // operator to link this worker to a manager.
 type EnrollParams struct {
+	// Name is what the operator calls this machine, asked during the
+	// setup wizard. It's what the manager reports this worker as — see
+	// transport.Report.Name.
+	Name string
 	// ManagerAddr is the manager's enrollment endpoint, host:port.
 	ManagerAddr string
 	// Token is the one-time enrollment token from `sitrep manager token create`.
@@ -43,16 +46,16 @@ func Enroll(ctx context.Context, p EnrollParams) (*config.WorkerConfig, error) {
 		return nil, err
 	}
 
-	hostname, err := os.Hostname()
-	if err != nil || hostname == "" {
-		hostname = string(workerID)
+	name := p.Name
+	if name == "" {
+		name = string(workerID)
 	}
 
 	client := transport.NewEnrollClient(p.CAFingerprint)
 	resp, err := transport.Enroll(ctx, client, p.ManagerAddr, transport.EnrollRequest{
-		Token:    p.Token,
-		Hostname: hostname,
-		CSRPEM:   csrPEM,
+		Token:  p.Token,
+		Name:   name,
+		CSRPEM: csrPEM,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("enroll with manager: %w", err)
@@ -69,6 +72,7 @@ func Enroll(ctx context.Context, p EnrollParams) (*config.WorkerConfig, error) {
 	}
 
 	cfg := &config.WorkerConfig{
+		Name:            name,
 		WorkerID:        resp.WorkerID,
 		ManagerAddr:     resp.ManagerAddr,
 		IntervalSeconds: resp.IntervalSeconds,

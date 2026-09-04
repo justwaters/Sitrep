@@ -38,7 +38,7 @@ func (h *EnrollHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := h.Tokens.Consume(req.Token); err != nil {
-		h.logger().Warn("enrollment rejected: bad token", "hostname", req.Hostname, "err", err)
+		h.logger().Warn("enrollment rejected: bad token", "name", req.Name, "err", err)
 		http.Error(w, "invalid or expired enrollment token", http.StatusUnauthorized)
 		return
 	}
@@ -79,7 +79,7 @@ func (h *EnrollHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ManagerAddr:     reportAddr,
 	}
 
-	h.logger().Info("worker enrolled", "worker_id", workerID, "hostname", req.Hostname)
+	h.logger().Info("worker enrolled", "worker_id", workerID, "name", req.Name)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

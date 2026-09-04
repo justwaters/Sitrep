@@ -12,7 +12,7 @@ type WorkerID string
 // Report is what a worker POSTs to /report on each interval tick.
 type Report struct {
 	WorkerID  WorkerID              `json:"worker_id"`
-	Hostname  string                `json:"hostname"`
+	Name      string                `json:"name"`      // operator-chosen at setup time — see EnrollRequest.Name
 	Timestamp int64                 `json:"timestamp"` // epoch seconds (UTC), set by worker at collection time
 	Stats     map[string]StatResult `json:"stats"`     // key = Checker.Name()
 }
@@ -38,9 +38,9 @@ type ReportAck struct {
 // EnrollRequest is POSTed once, over the bootstrap (server-auth-only) TLS
 // listener, before the worker has a client cert.
 type EnrollRequest struct {
-	Token    string `json:"token"`
-	Hostname string `json:"hostname"`
-	CSRPEM   []byte `json:"csr_pem"` // worker generates its own keypair + CSR; the private key never leaves the worker
+	Token  string `json:"token"`
+	Name   string `json:"name"`    // operator-chosen name for this machine, set during the worker setup wizard
+	CSRPEM []byte `json:"csr_pem"` // worker generates its own keypair + CSR; the private key never leaves the worker
 }
 
 // EnrollResponse hands the worker everything it needs to start reporting.

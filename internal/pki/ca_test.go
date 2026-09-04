@@ -7,12 +7,12 @@ import (
 )
 
 func TestCAIssueAndVerifyServerCert(t *testing.T) {
-	ca, err := GenerateCA()
+	ca, err := GenerateCA("")
 	if err != nil {
 		t.Fatalf("GenerateCA: %v", err)
 	}
 
-	certDER, keyDER, err := ca.IssueServerCert([]string{"127.0.0.1", "localhost"})
+	certDER, keyDER, err := ca.IssueServerCert([]string{"127.0.0.1", "localhost"}, "")
 	if err != nil {
 		t.Fatalf("IssueServerCert: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestCAIssueAndVerifyServerCert(t *testing.T) {
 }
 
 func TestCAIssueClientCertFromCSR(t *testing.T) {
-	ca, err := GenerateCA()
+	ca, err := GenerateCA("")
 	if err != nil {
 		t.Fatalf("GenerateCA: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestCAIssueClientCertFromCSR(t *testing.T) {
 }
 
 func TestCAIssueClientCertFromCSR_InvalidSignature(t *testing.T) {
-	ca, err := GenerateCA()
+	ca, err := GenerateCA("")
 	if err != nil {
 		t.Fatalf("GenerateCA: %v", err)
 	}
@@ -109,16 +109,16 @@ func TestCAIssueClientCertFromCSR_InvalidSignature(t *testing.T) {
 }
 
 func TestVerifyRejectsWrongCA(t *testing.T) {
-	ca1, err := GenerateCA()
+	ca1, err := GenerateCA("")
 	if err != nil {
 		t.Fatalf("GenerateCA: %v", err)
 	}
-	ca2, err := GenerateCA()
+	ca2, err := GenerateCA("")
 	if err != nil {
 		t.Fatalf("GenerateCA: %v", err)
 	}
 
-	certDER, _, err := ca1.IssueServerCert([]string{"127.0.0.1"})
+	certDER, _, err := ca1.IssueServerCert([]string{"127.0.0.1"}, "")
 	if err != nil {
 		t.Fatalf("IssueServerCert: %v", err)
 	}

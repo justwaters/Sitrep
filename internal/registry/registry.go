@@ -15,7 +15,7 @@ import (
 // WorkerEntry is a worker's current known state.
 type WorkerEntry struct {
 	ID         transport.WorkerID
-	Hostname   string
+	Name       string
 	EnrolledAt time.Time
 	LastSeen   time.Time
 	LastReport *transport.Report
@@ -43,7 +43,7 @@ func (r *Registry) Upsert(report *transport.Report) {
 		entry = &WorkerEntry{ID: report.WorkerID, EnrolledAt: time.Now()}
 		r.workers[report.WorkerID] = entry
 	}
-	entry.Hostname = report.Hostname
+	entry.Name = report.Name
 	entry.LastSeen = time.Now()
 	entry.LastReport = report
 }

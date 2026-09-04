@@ -54,7 +54,7 @@ func runWorkerStart(cmd *cobra.Command, dataDir string, foreground bool) error {
 
 	if !foreground {
 		status, _ := sysd.Status(sysd.WorkerUnitName)
-		fmt.Fprintf(out, "Worker is already enrolled and configured at %s.\n", configPath)
+		fmt.Fprintf(out, "Worker %q is already enrolled and configured at %s.\n", cfg.Name, configPath)
 		fmt.Fprintf(out, "systemd service %s status: %s\n", sysd.WorkerUnitName, status)
 		return nil
 	}
@@ -69,7 +69,7 @@ func runWorkerStart(cmd *cobra.Command, dataDir string, foreground bool) error {
 	defer stop()
 
 	logger.Info("worker starting",
-		"worker_id", cfg.WorkerID, "manager_addr", cfg.ManagerAddr, "interval_seconds", cfg.IntervalSeconds)
+		"name", cfg.Name, "worker_id", cfg.WorkerID, "manager_addr", cfg.ManagerAddr, "interval_seconds", cfg.IntervalSeconds)
 	svc.Run(ctx)
 	return nil
 }

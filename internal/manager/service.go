@@ -37,7 +37,7 @@ type Service struct {
 // server certificate under cfg.DataDir, then builds the enrollment,
 // report, and local API servers ready to run.
 func NewService(cfg *config.ManagerConfig, configPath string, logger *slog.Logger) (*Service, error) {
-	ca, err := pki.LoadOrCreateCA(config.ManagerCACertPath(cfg.DataDir), config.ManagerCAKeyPath(cfg.DataDir))
+	ca, err := pki.LoadOrCreateCA(config.ManagerCACertPath(cfg.DataDir), config.ManagerCAKeyPath(cfg.DataDir), cfg.Name)
 	if err != nil {
 		return nil, fmt.Errorf("load/create CA: %w", err)
 	}
@@ -131,7 +131,7 @@ func loadOrIssueServerCert(ca *pki.CA, cfg *config.ManagerConfig) (tls.Certifica
 		return pki.LoadTLSCertificate(certPath, keyPath)
 	}
 
-	certDER, keyDER, err := ca.IssueServerCert(serverCertHosts(cfg))
+	certDER, keyDER, err := ca.IssueServerCert(serverCertHosts(cfg), cfg.Name)
 	if err != nil {
 		return tls.Certificate{}, fmt.Errorf("issue server certificate: %w", err)
 	}

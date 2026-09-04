@@ -8,7 +8,7 @@ import (
 )
 
 func TestWriteReadCertPEM(t *testing.T) {
-	ca, err := GenerateCA()
+	ca, err := GenerateCA("")
 	if err != nil {
 		t.Fatalf("GenerateCA: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestWriteReadCertPEM(t *testing.T) {
 }
 
 func TestWriteReadKeyPEM(t *testing.T) {
-	ca, err := GenerateCA()
+	ca, err := GenerateCA("")
 	if err != nil {
 		t.Fatalf("GenerateCA: %v", err)
 	}
@@ -77,12 +77,12 @@ func TestLoadOrCreateCA(t *testing.T) {
 	certPath := filepath.Join(dir, "ca.crt.pem")
 	keyPath := filepath.Join(dir, "ca.key.pem")
 
-	ca1, err := LoadOrCreateCA(certPath, keyPath)
+	ca1, err := LoadOrCreateCA(certPath, keyPath, "test-manager")
 	if err != nil {
 		t.Fatalf("LoadOrCreateCA (create): %v", err)
 	}
 
-	ca2, err := LoadOrCreateCA(certPath, keyPath)
+	ca2, err := LoadOrCreateCA(certPath, keyPath, "test-manager")
 	if err != nil {
 		t.Fatalf("LoadOrCreateCA (load): %v", err)
 	}
@@ -93,7 +93,7 @@ func TestLoadOrCreateCA(t *testing.T) {
 }
 
 func TestLoadCertPool(t *testing.T) {
-	ca, err := GenerateCA()
+	ca, err := GenerateCA("")
 	if err != nil {
 		t.Fatalf("GenerateCA: %v", err)
 	}

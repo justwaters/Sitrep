@@ -68,7 +68,7 @@ func runManagerTokenCreate(cmd *cobra.Command, dataDir string, ttl time.Duration
 	}
 
 	w := cmd.OutOrStdout()
-	fmt.Fprintln(w, "Enrollment token created. Give the worker operator all four of these values:")
+	fmt.Fprintf(w, "Enrollment token created for manager %q. Give the worker operator all four of these values:\n", out.ManagerName)
 	fmt.Fprintf(w, "  Manager address:  %s\n", out.EnrollAddr)
 	fmt.Fprintf(w, "  Token:            %s\n", out.Token)
 	fmt.Fprintf(w, "  Expires:          %s\n", time.Unix(out.ExpiresAt, 0).Format(time.RFC3339))

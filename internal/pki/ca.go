@@ -35,8 +35,10 @@ type CA struct {
 	Key     *ecdsa.PrivateKey
 }
 
-// GenerateCA creates a new self-signed ECDSA P-256 root CA.
-func GenerateCA() (*CA, error) {
+// GenerateCA creates a new self-signed ECDSA P-256 root CA. name is the
+// operator-chosen manager name (see config.ManagerConfig.Name) embedded in
+// the CA's common name; an empty name falls back to a generic label.
+func GenerateCA(name string) (*CA, error) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("generate CA key: %w", err)
@@ -50,7 +52,7 @@ func GenerateCA() (*CA, error) {
 	now := time.Now()
 	tmpl := &x509.Certificate{
 		SerialNumber:          serial,
-		Subject:               pkix.Name{CommonName: "Sitrep Root CA", Organization: []string{"Sitrep"}},
+		Subject:               pkix.Name{CommonName: caCommonName(name), Organization: []string{"Sitrep"}},
 		NotBefore:             now.Add(-5 * time.Minute), // tolerate minor clock skew
 		NotAfter:              now.Add(CAValidity),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign | x509.KeyUsageDigitalSignature,
@@ -96,14 +98,15 @@ func LoadCA(certPath, keyPath string) (*CA, error) {
 }
 
 // LoadOrCreateCA loads the CA at certPath/keyPath if present, or generates
-// and persists a new one if not. This is what the manager calls on every
-// startup.
-func LoadOrCreateCA(certPath, keyPath string) (*CA, error) {
+// and persists a new one (using name as its common name) if not. This is
+// what the manager calls on every startup; name is only used the first
+// time, when there's nothing on disk yet to load.
+func LoadOrCreateCA(certPath, keyPath, name string) (*CA, error) {
 	ca, err := LoadCA(certPath, keyPath)
 	if err == nil {
 		return ca, nil
 	}
-	ca, err = GenerateCA()
+	ca, err = GenerateCA(name)
 	if err != nil {
 		return nil, err
 	}
@@ -113,10 +116,26 @@ func LoadOrCreateCA(certPath, keyPath string) (*CA, error) {
 	return ca, nil
 }
 
+func caCommonName(name string) string {
+	if name == "" {
+		return "Sitrep Root CA"
+	}
+	return name + " Root CA"
+}
+
+func serverCommonName(name string) string {
+	if name == "" {
+		return "sitrep-manager"
+	}
+	return name
+}
+
 // IssueServerCert generates a fresh ECDSA key and issues a server
 // certificate for it, signed by ca, valid for the given hosts (DNS names
-// and/or IP addresses).
-func (ca *CA) IssueServerCert(hosts []string) (certDER []byte, keyDER []byte, err error) {
+// and/or IP addresses). name is the operator-chosen manager name, used as
+// the certificate's common name; an empty name falls back to a generic
+// label.
+func (ca *CA) IssueServerCert(hosts []string, name string) (certDER []byte, keyDER []byte, err error) {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("generate server key: %w", err)
@@ -130,7 +149,7 @@ func (ca *CA) IssueServerCert(hosts []string) (certDER []byte, keyDER []byte, er
 	now := time.Now()
 	tmpl := &x509.Certificate{
 		SerialNumber: serial,
-		Subject:      pkix.Name{CommonName: "sitrep-manager"},
+		Subject:      pkix.Name{CommonName: serverCommonName(name)},
 		NotBefore:    now.Add(-5 * time.Minute),
 		NotAfter:     now.Add(ServerValidity),
 		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,

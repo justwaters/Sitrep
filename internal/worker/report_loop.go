@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -57,12 +56,12 @@ func (rl *ReportLoop) Run(ctx context.Context) {
 }
 
 func (rl *ReportLoop) tick(ctx context.Context) {
-	hostname, err := os.Hostname()
-	if err != nil || hostname == "" {
-		hostname = string(rl.snapshotWorkerID())
+	workerID, name, managerAddr, checks := rl.snapshot()
+	if name == "" {
+		// Defensive fallback only — the setup wizard always asks for a
+		// name and persists it, so this should never trigger in practice.
+		name = string(workerID)
 	}
-
-	workerID, managerAddr, checks := rl.snapshot()
 
 	cctx, cancel := context.WithTimeout(ctx, tickTimeout)
 	defer cancel()
@@ -70,7 +69,7 @@ func (rl *ReportLoop) tick(ctx context.Context) {
 	results := rl.Stats.CollectEnabled(cctx, checks)
 	report := transport.Report{
 		WorkerID:  workerID,
-		Hostname:  hostname,
+		Name:      name,
 		Timestamp: time.Now().Unix(),
 		Stats:     results,
 	}
@@ -83,18 +82,12 @@ func (rl *ReportLoop) tick(ctx context.Context) {
 	rl.applyAck(ack)
 }
 
-func (rl *ReportLoop) snapshot() (transport.WorkerID, string, []string) {
+func (rl *ReportLoop) snapshot() (workerID transport.WorkerID, name, managerAddr string, checks []string) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-	checks := make([]string, len(rl.Config.EnabledChecks))
+	checks = make([]string, len(rl.Config.EnabledChecks))
 	copy(checks, rl.Config.EnabledChecks)
-	return rl.Config.WorkerID, rl.Config.ManagerAddr, checks
-}
-
-func (rl *ReportLoop) snapshotWorkerID() transport.WorkerID {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-	return rl.Config.WorkerID
+	return rl.Config.WorkerID, rl.Config.Name, rl.Config.ManagerAddr, checks
 }
 
 func (rl *ReportLoop) currentInterval() time.Duration {

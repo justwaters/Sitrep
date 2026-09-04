@@ -61,6 +61,7 @@ func (h *Handler) createToken(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt:             t.ExpiresAt.Unix(),
 		EnrollAddr:            enrollAddr,
 		ServerCertFingerprint: h.ServerCertFingerprint,
+		ManagerName:           h.Config.Name,
 	})
 }
 
@@ -125,6 +126,7 @@ func (h *Handler) patchConfig(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) configResponse() ConfigResponse {
 	interval, checks := h.Config.Snapshot()
 	return ConfigResponse{
+		Name:            h.Config.Name,
 		ListenAddr:      h.Config.ListenAddr,
 		APIListenAddr:   h.Config.APIListenAddr,
 		IntervalSeconds: interval,
@@ -135,7 +137,7 @@ func (h *Handler) configResponse() ConfigResponse {
 func summaryOf(e *registry.WorkerEntry) WorkerSummary {
 	return WorkerSummary{
 		ID:         string(e.ID),
-		Hostname:   e.Hostname,
+		Name:       e.Name,
 		EnrolledAt: e.EnrolledAt.Unix(),
 		LastSeen:   e.LastSeen.Unix(),
 	}

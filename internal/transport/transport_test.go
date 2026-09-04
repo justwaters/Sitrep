@@ -15,7 +15,7 @@ import (
 
 func issueServerCert(t *testing.T, ca *pki.CA) tls.Certificate {
 	t.Helper()
-	certDER, keyDER, err := ca.IssueServerCert([]string{"127.0.0.1"})
+	certDER, keyDER, err := ca.IssueServerCert([]string{"127.0.0.1"}, "")
 	if err != nil {
 		t.Fatalf("IssueServerCert: %v", err)
 	}
@@ -36,7 +36,7 @@ func shutdownSoon(t *testing.T, srv *transport.Server) {
 }
 
 func TestEnrollServer_NoClientCertRequired(t *testing.T) {
-	ca, err := pki.GenerateCA()
+	ca, err := pki.GenerateCA("")
 	if err != nil {
 		t.Fatalf("GenerateCA: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestEnrollServer_NoClientCertRequired(t *testing.T) {
 }
 
 func TestReportServer_RequiresClientCert(t *testing.T) {
-	ca, err := pki.GenerateCA()
+	ca, err := pki.GenerateCA("")
 	if err != nil {
 		t.Fatalf("GenerateCA: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestReportServer_RequiresClientCert(t *testing.T) {
 }
 
 func TestEnrollClient_FingerprintPinning(t *testing.T) {
-	ca, err := pki.GenerateCA()
+	ca, err := pki.GenerateCA("")
 	if err != nil {
 		t.Fatalf("GenerateCA: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestEnrollClient_FingerprintPinning(t *testing.T) {
 
 	client := transport.NewEnrollClient(fingerprint)
 	resp, err := transport.Enroll(context.Background(), client, srv.Addr().String(), transport.EnrollRequest{
-		Token: "tok", Hostname: "h", CSRPEM: []byte("csr"),
+		Token: "tok", Name: "h", CSRPEM: []byte("csr"),
 	})
 	if err != nil {
 		t.Fatalf("Enroll: %v", err)
@@ -161,7 +161,7 @@ func TestEnrollClient_FingerprintPinning(t *testing.T) {
 }
 
 func TestEnrollClient_WrongFingerprintRejected(t *testing.T) {
-	ca, err := pki.GenerateCA()
+	ca, err := pki.GenerateCA("")
 	if err != nil {
 		t.Fatalf("GenerateCA: %v", err)
 	}

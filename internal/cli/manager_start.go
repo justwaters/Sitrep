@@ -54,7 +54,7 @@ func runManagerStart(cmd *cobra.Command, dataDir string, foreground bool) error 
 
 	if !foreground {
 		status, _ := sysd.Status(sysd.ManagerUnitName)
-		fmt.Fprintf(out, "Manager is already configured at %s.\n", configPath)
+		fmt.Fprintf(out, "Manager %q is already configured at %s.\n", cfg.Name, configPath)
 		fmt.Fprintf(out, "systemd service %s status: %s\n", sysd.ManagerUnitName, status)
 		fmt.Fprintf(out, "Run `sitrep manager token create` to enroll a new worker.\n")
 		return nil
@@ -72,6 +72,6 @@ func runManagerStart(cmd *cobra.Command, dataDir string, foreground bool) error 
 	defer stop()
 
 	logger.Info("manager starting",
-		"report_addr", cfg.ListenAddr, "enroll_addr", cfg.EnrollAddr, "api_addr", cfg.APIListenAddr)
+		"name", cfg.Name, "report_addr", cfg.ListenAddr, "enroll_addr", cfg.EnrollAddr, "api_addr", cfg.APIListenAddr)
 	return svc.Run(ctx)
 }

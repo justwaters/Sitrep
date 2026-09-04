@@ -29,6 +29,7 @@ func runManagerWizard(cmd *cobra.Command, dataDir, configPath string) (*config.M
 	fmt.Fprintln(out, "Sitrep manager setup")
 	fmt.Fprintln(out, "=====================")
 
+	name := defaultMachineName()
 	listenAddr := cfg.ListenAddr
 	enrollAddr := cfg.EnrollAddr
 	advertiseHost := cfg.AdvertiseHost
@@ -37,6 +38,13 @@ func runManagerWizard(cmd *cobra.Command, dataDir, configPath string) (*config.M
 	enabledChecks := append([]string(nil), transport.AllChecks...)
 
 	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("What do you want to call this machine?").
+				Description("Identifies this manager in its certificates and in `token create` output.").
+				Value(&name).
+				Validate(requireNonEmpty),
+		),
 		huh.NewGroup(
 			huh.NewNote().
 				Title("Listen addresses").
@@ -74,6 +82,7 @@ func runManagerWizard(cmd *cobra.Command, dataDir, configPath string) (*config.M
 		return nil, fmt.Errorf("invalid reporting interval %q", intervalStr)
 	}
 
+	cfg.Name = name
 	cfg.ListenAddr = listenAddr
 	cfg.EnrollAddr = enrollAddr
 	cfg.AdvertiseHost = advertiseHost
@@ -111,7 +120,7 @@ func runManagerWizard(cmd *cobra.Command, dataDir, configPath string) (*config.M
 		return nil, fmt.Errorf("install systemd service: %w", err)
 	}
 
-	fmt.Fprintf(out, "\nDone. The manager is now running in the background as %s.\n", sysd.ManagerUnitName)
+	fmt.Fprintf(out, "\nDone. %q is now running in the background as %s.\n", cfg.Name, sysd.ManagerUnitName)
 	fmt.Fprintf(out, "Check its status any time with: systemctl status %s\n", sysd.ManagerUnitName)
 	fmt.Fprintln(out, "\nNext: run `sitrep manager token create` to enroll a worker.")
 

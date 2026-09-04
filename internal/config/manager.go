@@ -13,6 +13,10 @@ import (
 // live in memory behind a mutex (see ManagerConfig.Mu) so the local API's
 // PATCH /v1/config can change it at runtime without a restart.
 type ManagerConfig struct {
+	// Name is what this manager is called, chosen by the operator during
+	// setup. It's embedded in the CA and server certificate common names
+	// and shown wherever the manager identifies itself (e.g. `token create`).
+	Name string `yaml:"name"`
 	// ListenAddr is the mTLS report listener address, e.g. "0.0.0.0:8443".
 	ListenAddr string `yaml:"listen_addr"`
 	// EnrollAddr is the bootstrap (server-auth-only) enrollment listener

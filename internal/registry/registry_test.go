@@ -9,15 +9,15 @@ import (
 
 func TestUpsertGetList(t *testing.T) {
 	r := New()
-	report := &transport.Report{WorkerID: "wkr_1", Hostname: "host1", Timestamp: 123}
+	report := &transport.Report{WorkerID: "wkr_1", Name: "host1", Timestamp: 123}
 	r.Upsert(report)
 
 	entry, ok := r.Get("wkr_1")
 	if !ok {
 		t.Fatal("expected entry to exist")
 	}
-	if entry.Hostname != "host1" {
-		t.Errorf("hostname = %q, want host1", entry.Hostname)
+	if entry.Name != "host1" {
+		t.Errorf("name = %q, want host1", entry.Name)
 	}
 	if entry.LastReport.Timestamp != 123 {
 		t.Errorf("timestamp = %d, want 123", entry.LastReport.Timestamp)
@@ -62,7 +62,7 @@ func TestConcurrentAccess(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			const id = transport.WorkerID("wkr_concurrent")
-			r.Upsert(&transport.Report{WorkerID: id, Hostname: "h"})
+			r.Upsert(&transport.Report{WorkerID: id, Name: "h"})
 			r.Get(id)
 			r.List()
 		}()
