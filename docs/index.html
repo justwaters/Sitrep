@@ -167,7 +167,36 @@
     </div>
   </section>
 
-  <section class="section alt" id="checks">
+  <section class="section alt quickstart" id="quickstart">
+    <div class="section-inner">
+      <p class="eyebrow reveal">install</p>
+      <h2 class="reveal">Build it, ship it, run it.</h2>
+
+      <div class="code-block">
+        <div class="code-block-head">
+          <span>build</span>
+          <button class="copy-btn" type="button" data-copy-target="code-build">copy</button>
+        </div>
+        <pre><code id="code-build">git clone https://github.com/justwaters/Sitrep.git
+cd Sitrep
+make linux</code></pre>
+      </div>
+
+      <div class="code-block">
+        <div class="code-block-head">
+          <span>run</span>
+          <button class="copy-btn" type="button" data-copy-target="code-run">copy</button>
+        </div>
+        <pre><code id="code-run">sudo sitrep manager start
+sudo sitrep manager token create
+sudo sitrep worker start</code></pre>
+      </div>
+
+      <p class="quickstart-note">Requires Linux with systemd. Full walkthrough, config reference, and API docs live in the <a href="docs.html">docs</a>.</p>
+    </div>
+  </section>
+
+  <section class="section" id="checks">
     <div class="section-inner">
       <p class="eyebrow reveal">what gets checked</p>
       <h2 class="reveal">Five checks, each one optional.</h2>
@@ -201,7 +230,7 @@
     </div>
   </section>
 
-  <section class="section" id="security">
+  <section class="section alt" id="security">
     <div class="section-inner">
       <p class="eyebrow reveal">security</p>
       <h2 class="reveal">Two ports. One CA. No external PKI.</h2>
@@ -236,7 +265,7 @@
     </div>
   </section>
 
-  <section class="section alt" id="api">
+  <section class="section" id="api">
     <div class="section-inner">
       <p class="eyebrow reveal">local api</p>
       <h2 class="reveal">Your fleet, queryable in one curl.</h2>
@@ -248,35 +277,6 @@
         <div class="api-row"><code>PATCH /v1/config</code><span>Change the interval or checks — rolls out fleet-wide within one interval.</span></div>
         <div class="api-row"><code>POST /v1/tokens</code><span>Create a one-time worker enrollment token.</span></div>
       </div>
-    </div>
-  </section>
-
-  <section class="section quickstart" id="quickstart">
-    <div class="section-inner">
-      <p class="eyebrow reveal">install</p>
-      <h2 class="reveal">Build it, ship it, run it.</h2>
-
-      <div class="code-block">
-        <div class="code-block-head">
-          <span>build</span>
-          <button class="copy-btn" type="button" data-copy-target="code-build">copy</button>
-        </div>
-        <pre><code id="code-build">git clone https://github.com/justwaters/Sitrep.git
-cd Sitrep
-make linux</code></pre>
-      </div>
-
-      <div class="code-block">
-        <div class="code-block-head">
-          <span>run</span>
-          <button class="copy-btn" type="button" data-copy-target="code-run">copy</button>
-        </div>
-        <pre><code id="code-run">sudo sitrep manager start
-sudo sitrep manager token create
-sudo sitrep worker start</code></pre>
-      </div>
-
-      <p class="quickstart-note">Requires Linux with systemd. Full walkthrough, config reference, and API docs live in the <a href="docs.html">docs</a>.</p>
     </div>
   </section>
 
